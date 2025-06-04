@@ -258,8 +258,8 @@ class TumorSample:
         file_in = open(filen) if type(filen) == str else filen
 
         header = file_in.readline()
-        while header[0] == "#" or not header.strip():
-            header = header.readline()
+        while header.startswith("#") or not header.strip():
+            header = file_in.readline()
         header = header.strip().split("\t")
         h = collections.OrderedDict([[x[1], x[0]] for x in enumerate(header)])
 
