@@ -108,6 +108,16 @@ To run SinglePatientTiming:
 
     ./PhylogicNDT.py Timing -i Indiv_ID -sif Patient.sif
 
+Additional options allow tuning of the whole genome doubling (WGD) calling
+criteria.  Use `--wgd_min_autosomes` to set the minimum number of autosomes
+with high copy number and `--wgd_autosome_cn` to choose the copy number
+threshold.  By default WGD is called when more than 10 autosomes have an
+estimated copy number greater than 2.0.
+Alternatively you can bypass automatic calling by supplying a list of
+WGD-positive samples with `--wgd_samples`.  Provide a comma separated list
+or a text file and only those samples will be treated as WGD in the timing
+analysis.
+
 ### LeagueModel
 LeagueModel requires an input of comparison tables.
 The comparison tables should be the output of SinglePatientTiming ending in ".comp.tsv"
