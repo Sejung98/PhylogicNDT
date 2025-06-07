@@ -21,21 +21,30 @@ class TimingEngine(object):
     Class for holding samples
     """
     def __init__(self, patient, cn_state_whitelist=_cn_state_whitelist, chromosomes=_chromosomes,
-                 arms=_arms, min_supporting_muts=3):
+                 arms=_arms, min_supporting_muts=3, wgd_min_autosomes=10,
+                 wgd_cn_cutoff=2.0, wgd_concordance_threshold=.8, force_wgd_samples=None):
         self.patient = patient
         self.cn_state_whitelist = cn_state_whitelist
         self.arm_regions = list(itertools.product(chromosomes, arms))
         self.min_supporting_muts = min_supporting_muts
+        self.wgd_min_autosomes = wgd_min_autosomes
+        self.wgd_cn_cutoff = wgd_cn_cutoff
+        self.wgd_concordance_threshold = wgd_concordance_threshold
+        self.force_wgd_samples = set(force_wgd_samples) if force_wgd_samples else set()
         self.sample_list = []
         for sample in self.patient.sample_list:
             timing_sample = TimingSample(sample, self)
             self.sample_list.append(timing_sample)
+        if self.force_wgd_samples:
+            for sample in self.sample_list:
+                if sample.sample_name in self.force_wgd_samples:
+                    sample.force_wgd()
         self.concordant_cn_states = {}
         self.timeable_muts = {}
         self.all_cn_events = {}
         self.get_concordant_cn_states()
         self.WGD = None
-        self.call_wgd()
+        self.call_wgd(concordance_threshold=self.wgd_concordance_threshold)
         self.mutations = {}
         self.get_mutations()
         self.truncal_cn_events = {}
@@ -98,10 +107,12 @@ class TimingEngine(object):
                                                       supporting_muts=supporting_muts)
                     self.concordant_cn_states[chrN + arm] = multisample_state
 
-    def call_wgd(self, concordance_threshold=.8, tol=.2):  # TODO: try other concordance thresholds
+    def call_wgd(self, concordance_threshold=None, tol=.2):  # TODO: try other concordance thresholds
         """
         call WGD event for a patient across all samples
         """
+        if concordance_threshold is None:
+            concordance_threshold = self.wgd_concordance_threshold
         min_pi = np.ones(101)
         for sample in self.sample_list:  # call WGD event in samples first
             sample.fill_mutation_intervaltree(concordant_muts=self.timeable_muts)
@@ -355,8 +366,6 @@ class TimingSample(object):
         call WGD for a sample by looking at supporting (0/2 and 2/2) regions
         """
         # TODO: filter outlier pi distributions
-        regions_supporting_WGD = []
-        regions_both_arms_gained = []
         supporting_arm_states = []
         if use_concordant_states:
             if self.WGD is None:
@@ -370,19 +379,36 @@ class TimingSample(object):
                 cn_state.call_events(wgd=True)
         else:
             for cn_state in self.cn_states.values():
-                if cn_state.cn_a2 >= 2:
+                if cn_state.cn_a1 >= self.engine.wgd_cn_cutoff and cn_state.cn_a2 >= self.engine.wgd_cn_cutoff:
                     supporting_arm_states.append(cn_state)
-                if (cn_state.cn_a1 == 0 or cn_state.cn_a1 >= 2) and cn_state.cn_a2 >= 2:  # region supports WGD if 0/2 or 2/2
-                    regions_supporting_WGD.append(cn_state)
-                if cn_state.cn_a1 >= 2 and cn_state.cn_a2 >= 2:
-                    regions_both_arms_gained.append(cn_state)
-            if len(regions_both_arms_gained) >= 5 and len(regions_supporting_WGD) * 2 >= \
-                    len(self.arm_regions) - len(self.missing_arms):
-                supporting_arm_states = [TimingCNState([self], s.chrN, s.arm, (s.cn_a1, s.cn_a2), s.purity, supporting_muts=s.supporting_muts) for
-                                         s in supporting_arm_states]
+            autosomes_high_cn = 0
+            for chrom in map(str, range(1, 23)):
+                key_p = chrom + 'p'
+                key_q = chrom + 'q'
+                if key_p in self.cn_states and key_q in self.cn_states:
+                    total_cn = (self.cn_states[key_p].cn_a1 + self.cn_states[key_p].cn_a2 +
+                                self.cn_states[key_q].cn_a1 + self.cn_states[key_q].cn_a2) / 2.0
+                    if total_cn > self.engine.wgd_cn_cutoff * 2:
+                        autosomes_high_cn += 1
+            if autosomes_high_cn > self.engine.wgd_min_autosomes:
+                supporting_arm_states = [TimingCNState([self], s.chrN, s.arm, (s.cn_a1, s.cn_a2), s.purity,
+                                                     supporting_muts=s.supporting_muts) for s in supporting_arm_states]
                 self.WGD = TimingWGD(supporting_arm_states=supporting_arm_states)
                 for cn_state in self.cn_states.values():
                     cn_state.call_events(wgd=True)
+
+    def force_wgd(self):
+        """Force WGD status using current copy-number states"""
+        supporting_arm_states = []
+        for cn_state in self.cn_states.values():
+            if cn_state.cn_a1 >= self.engine.wgd_cn_cutoff and cn_state.cn_a2 >= self.engine.wgd_cn_cutoff:
+                supporting_arm_states.append(cn_state)
+        supporting_arm_states = [TimingCNState([self], s.chrN, s.arm, (s.cn_a1, s.cn_a2),
+                                               [self.purity], supporting_muts=s.supporting_muts)
+                               for s in supporting_arm_states]
+        self.WGD = TimingWGD(supporting_arm_states=supporting_arm_states)
+        for cn_state in self.cn_states.values():
+            cn_state.call_events(wgd=True)
 
     def get_arm_level_cn_events(self, use_concordant_states=False):
         """

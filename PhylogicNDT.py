@@ -410,6 +410,24 @@ def build_parser():
                         dest='min_supporting_muts',
                         default=3,
                         help='Minimum number of supporting mutations to time a copy number event')
+    timing.add_argument('--wgd_min_autosomes',
+                        type=int,
+                        action='store',
+                        dest='wgd_min_autosomes',
+                        default=10,
+                        help='Minimum number of autosomes with high copy number to call WGD')
+    timing.add_argument('--wgd_autosome_cn',
+                        type=float,
+                        action='store',
+                        dest='wgd_autosome_cn',
+                        default=2.0,
+                        help='Copy number cutoff per autosome when calling WGD')
+    timing.add_argument('--wgd_samples',
+                        type=str,
+                        action='store',
+                        dest='wgd_samples',
+                        default=None,
+                        help='Comma separated list or file with sample names to force as WGD')
     timing.set_defaults(func=SinglePatientTiming.SinglePatientTiming.run_tool)
 
     single_patient_timing = subparsers.add_parser("SinglePatientTiming", help="Time somatic events in one or multiple samples.",
@@ -420,6 +438,24 @@ def build_parser():
                         dest='min_supporting_muts',
                         default=3,
                         help='Minimum number of supporting mutations to time a copy number event')
+    single_patient_timing.add_argument('--wgd_min_autosomes',
+                        type=int,
+                        action='store',
+                        dest='wgd_min_autosomes',
+                        default=10,
+                        help='Minimum number of autosomes with high copy number to call WGD')
+    single_patient_timing.add_argument('--wgd_autosome_cn',
+                        type=float,
+                        action='store',
+                        dest='wgd_autosome_cn',
+                        default=2.0,
+                        help='Copy number cutoff per autosome when calling WGD')
+    single_patient_timing.add_argument('--wgd_samples',
+                        type=str,
+                        action='store',
+                        dest='wgd_samples',
+                        default=None,
+                        help='Comma separated list or file with sample names to force as WGD')
     single_patient_timing.set_defaults(func=SinglePatientTiming.SinglePatientTiming.run_tool)
 
     leaguemodel = subparsers.add_parser("LeagueModel", help="Time somatic events across a cohort.",

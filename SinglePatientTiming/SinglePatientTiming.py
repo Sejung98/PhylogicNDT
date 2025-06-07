@@ -1,4 +1,5 @@
 import logging
+import os
 import numpy as np
 import itertools
 from data.Patient import Patient
@@ -47,7 +48,19 @@ def run_tool(args):
     patient_data.preprocess_samples()
     if args.min_supporting_muts < 1:
         raise ValueError('Invalid value for min_supporting_muts')
-    timing_engine = TimingEngine.TimingEngine(patient_data, min_supporting_muts=args.min_supporting_muts)
+    wgd_samples = None
+    if args.wgd_samples:
+        if os.path.isfile(args.wgd_samples):
+            with open(args.wgd_samples) as f:
+                wgd_samples = [line.strip() for line in f if line.strip()]
+        else:
+            wgd_samples = [s.strip() for s in args.wgd_samples.split(',') if s.strip()]
+    timing_engine = TimingEngine.TimingEngine(
+        patient_data,
+        min_supporting_muts=args.min_supporting_muts,
+        wgd_min_autosomes=args.wgd_min_autosomes,
+        wgd_cn_cutoff=args.wgd_autosome_cn,
+        force_wgd_samples=wgd_samples)
     timing_engine.time_events()
     phylogicoutput = PhylogicOutput()
     phylogicoutput.write_timing_tsv(timing_engine)
